@@ -50,7 +50,7 @@ def get_website_text(url):
 def analyze_with_gemini(main_text, privacy_text, main_url, api_key):
     """두 개의 텍스트 소스를 모두 활용해 분석하는 함수"""
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-flash-lastest') 
+    model = genai.GenerativeModel('gemini-flash-latest') 
     
     prompt = f"""
     당신은 경상남도교육청의 '학습지원 소프트웨어 선정 심의'를 담당하는 행정 전문가 AI입니다.
