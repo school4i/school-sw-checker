@@ -4,26 +4,24 @@ import requests
 from bs4 import BeautifulSoup
 
 # --- 1. 페이지 설정 ---
-st.set_page_config(page_title="학습지원 SW 심의 도우미", page_icon="🏫")
+st.set_page_config(page_title="학습지원 SW 심의 완전정복", page_icon="🏫", layout="wide")
 
-st.title("🏫 학습지원 SW 필수기준 자동 분석기")
+st.title("🏫 학습지원 SW 심의자료 자동 생성기")
 st.markdown("""
-2026학년도 학운위 심의를 위한 **[서식 2] 필수기준 체크리스트** 초안을 만들어 드립니다.
-분석하려는 사이트의 **'개인정보처리방침(Privacy Policy)'** URL을 입력해주세요.
+2026학년도 학운위 심의를 위한 **[서식 1, 2, 3]** 내용을 한 번에 생성합니다.
+정확한 분석을 위해 **두 가지 URL**을 모두 입력해 주시는 것이 좋습니다.
 """)
 
-# --- 2. 사이드바: API 키 입력 및 안내 ---
+# --- 2. 사이드바: 설정 ---
 with st.sidebar:
     st.header("설정")
     
-    # Secrets에 키가 있으면 그걸 쓰고, 없으면 입력창을 보여줌
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
         st.success("✅ 공용 API 키가 적용되었습니다.")
     else:
         api_key = st.text_input("Google API Key를 입력하세요", type="password")
         
-        # 🟢 요청하신 유튜브 링크 버튼 추가
         st.caption("키가 없으신가요? 아래 버튼을 눌러보세요!")
         st.link_button(
             label="📺 개인 API 키 발급 받는 방법 (영상)", 
@@ -35,6 +33,7 @@ with st.sidebar:
 
 def get_website_text(url):
     """URL에서 텍스트만 긁어오는 함수"""
+    if not url: return ""
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         response = requests.get(url, headers=headers, timeout=10)
@@ -48,33 +47,59 @@ def get_website_text(url):
     except Exception as e:
         return f"에러: {e}"
 
-def analyze_with_gemini(text_content, api_key):
-    """Gemini에게 분석을 요청하는 함수"""
+def analyze_with_gemini(main_text, privacy_text, main_url, api_key):
+    """두 개의 텍스트 소스를 모두 활용해 분석하는 함수"""
     genai.configure(api_key=api_key)
-    # 최신 모델 사용 (1.5 Flash)
-    model = genai.GenerativeModel('gemini-flash-latest') 
+    model = genai.GenerativeModel('gemini-flash-lastest') 
     
     prompt = f"""
-    당신은 대한민국 학교의 행정 업무를 돕는 AI입니다. 
-    아래 제공된 [약관/개인정보처리방침 텍스트]를 분석하여, 
-    '학습지원 소프트웨어 선정 필수기준' 5가지 항목의 충족 여부를 판단해주세요.
+    당신은 경상남도교육청의 '학습지원 소프트웨어 선정 심의'를 담당하는 행정 전문가 AI입니다.
+    제공된 [메인 홈페이지 정보]와 [개인정보처리방침 정보]를 종합하여 보고서를 작성해주세요.
 
-    [분석 기준 - 필수항목 5가지]
-    1. 최소처리 원칙 준수: 수집항목, 목적, 보유기간이 명시되어 있는가?
-    2. 개인정보 안전조치 의무: 암호화, 접근통제 등 안전성 확보 조치가 언급되어 있는가?
-    3. 이용자 권리: 열람, 정정, 삭제, 처리정지 요구 절차가 있는가?
-    4. 아동 보호: 만 14세 미만 아동(또는 Children)에 대한 보호 조치나 법정대리인 동의 절차가 있는가?
-    5. 책임자 및 위탁: 개인정보 보호책임자(CPO) 정보나 연락처가 있는가?
+    [분석 소스]
+    1. 메인 사이트 URL: {main_url}
+    2. 메인 페이지 텍스트(제품정보용): {main_text[:20000]}
+    3. 개인정보처리방침 텍스트(심의기준용): {privacy_text[:30000]}
 
-    [출력 형식]
-    각 항목별로 다음 형식에 맞춰 한국어로 작성해주세요.
-    - 결과: (충족 / 미충족 / 확인불가 중 택 1)
-    - 증빙: (약관에서 찾은 근거 문장을 짧게 발췌)
-    - 설명: (판단 이유를 한 문장으로 요약)
+    ---
+    ### 영역 1. 제품/서비스 개요 (서식 2 상단)
+    *주로 [메인 페이지 텍스트]를 참고하여 작성하세요.*
+    - 제품/서비스명: (서비스의 정확한 명칭)
+    - 공급자(기업명): (운영 회사 이름, 하단 카피라이트 등 참조)
+    - 주요 내용 및 기능·특장점: (학습 도구로서의 핵심 기능을 3~4줄로 요약)
 
-    [분석할 텍스트]
-    {text_content[:30000]} 
-    (텍스트가 너무 길면 앞부분 30,000자만 분석합니다)
+    ### 영역 2. 필수기준 세부 체크리스트 (서식 2 하단)
+    *반드시 [개인정보처리방침 텍스트]를 근거로 판단하세요.*
+    각 항목별로 '충족/미충족/확인불가'를 판단하고, 약관 내 문장을 찾아 '증빙'에 적으세요.
+    
+    **1. 최소처리 원칙 준수**
+    - 1-1. 개인정보가 최소한으로 수집되는가?
+    - 1-2. 개인정보 수집·이용 목적이 기재되어 있는가?
+    - 1-3. 수집항목, 보유기간 등이 기재되어 있는가?
+    
+    **2. 개인정보 안전조치 의무**
+    - 2-1. 안전성 확보 조치(암호화, 보안 등) 사항이 기재되어 있는가?
+    
+    **3. 이용자 권리**
+    - 3-1. 열람·정정·삭제·처리정지 요구 절차가 안내되어 있는가?
+    
+    **4. 아동 보호**
+    - 4-1. 만 14세 미만 아동(Children)의 법정대리인 동의 절차가 있는가?
+      (해외 사이트의 경우 '13세 미만 이용 제한' 등으로 되어 있다면 그 내용을 적고 '부분충족' 또는 '확인필요'로 표시)
+    
+    **5. 책임자 및 위탁**
+    - 5-1. 개인정보 보호책임자(CPO) 정보(이름/부서/연락처)가 있는가?
+    - 5-2. 제3자 제공에 관한 정보가 있는가?
+    - 5-3. 위·수탁 관계 정보가 있는가?
+
+    ### 영역 3. 추천 의견서 초안 (서식 3)
+    *[메인 페이지 텍스트]의 교육적 기능을 참고하여 작성하세요.*
+    - 선정 이유: 이 소프트웨어를 수업에 활용했을 때 기대되는 교육적 효과 (2~3문장)
+
+    ---
+    [작성 원칙]
+    - 한국어로 작성할 것.
+    - 증빙 자료는 실제 약관 문구를 인용할 것.
     """
     
     response = model.generate_content(prompt)
@@ -82,33 +107,57 @@ def analyze_with_gemini(text_content, api_key):
 
 # --- 4. 메인 화면 구성 ---
 
-url = st.text_input("분석할 URL 입력 (개인정보처리방침 페이지 주소 권장)", placeholder="예: https://gimkit.com/privacy")
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader("1️⃣ 메인 사이트 URL")
+    st.caption("제품명, 주요 기능 파악용 (예: padlet.com)")
+    main_url = st.text_input("메인 URL", label_visibility="collapsed", placeholder="https://padlet.com")
 
-if st.button("분석 시작 🚀"):
+with col2:
+    st.subheader("2️⃣ 개인정보처리방침 URL")
+    st.caption("필수 기준 충족 여부 확인용 (예: padlet.com/privacy)")
+    privacy_url = st.text_input("약관 URL", label_visibility="collapsed", placeholder="https://padlet.com/about/privacy")
+
+st.write("")
+analyze_btn = st.button("종합 분석 시작 🚀", type="primary", use_container_width=True)
+
+if analyze_btn:
     if not api_key:
         st.error("👈 왼쪽 사이드바에 API Key를 먼저 입력해주세요!")
-        st.stop() # 키가 없으면 여기서 멈춤
+        st.stop()
         
-    if not url:
-        st.warning("URL을 입력해주세요!")
+    if not privacy_url:
+        st.warning("⚠️ 최소한 '개인정보처리방침 URL'은 입력해야 심의가 가능합니다.")
     else:
-        with st.spinner("사이트를 읽고 분석 중입니다... 잠시만 기다려주세요 (약 10~20초)"):
-            site_text = get_website_text(url)
+        with st.spinner("두 개의 사이트를 모두 읽고 분석 중입니다... (약 30초)"):
+            # 1. 텍스트 수집
+            main_text = get_website_text(main_url) if main_url else "메인 URL이 입력되지 않음."
+            privacy_text = get_website_text(privacy_url)
             
-            if "에러" in site_text:
-                st.error(f"사이트 접속에 실패했습니다. 올바른 URL인지 확인해주세요.\n({site_text})")
+            error_msg = ""
+            if "에러" in main_text: error_msg += f"[메인URL 오류] {main_text}\n"
+            if "에러" in privacy_text: error_msg += f"[약관URL 오류] {privacy_text}\n"
+            
+            if error_msg and not privacy_text: # 약관도 못 읽었으면 중단
+                st.error(f"사이트 접속 실패:\n{error_msg}")
             else:
                 try:
-                    result = analyze_with_gemini(site_text, api_key)
+                    # 2. AI 분석
+                    result = analyze_with_gemini(main_text, privacy_text, main_url, api_key)
                     
-                    st.success("분석이 완료되었습니다!")
-                    st.subheader("📋 [서식 2] 작성 참고 자료")
-                    st.warning("⚠️ 이 내용은 AI 분석 결과이므로, 반드시 원문과 대조하여 최종 확인하시기 바랍니다.")
+                    st.success("🎉 분석 완료! 제품 정보와 법적 기준을 모두 확인했습니다.")
                     
-                    st.markdown(result)
+                    tab1, tab2 = st.tabs(["📄 종합 보고서", "🔍 원문 데이터"])
                     
-                    with st.expander("AI가 읽은 사이트 원문 보기"):
-                        st.write(site_text)
+                    with tab1:
+                        st.markdown(result)
+                        st.download_button("📥 보고서 다운로드 (.txt)", result, "심의자료_완료.txt")
+
+                    with tab2:
+                        st.write("### 🔹 메인 페이지 텍스트")
+                        st.text_area("Main", main_text, height=150)
+                        st.write("### 🔸 개인정보처리방침 텍스트")
+                        st.text_area("Privacy", privacy_text, height=150)
                         
                 except Exception as e:
-                    st.error(f"AI 분석 중 오류가 발생했습니다: {e}")
+                    st.error(f"오류 발생: {e}")
